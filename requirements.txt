@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+librosa
+numpy
+scikit-learn
+joblib
+soundfile
+scikit-learn==1.6.1

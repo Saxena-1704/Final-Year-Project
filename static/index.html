@@ -1,0 +1,303 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Deepfake Detector</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #0b1120;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: #151f33;
+            border: 1px solid #293750;
+            border-radius: 18px;
+            padding: 32px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .upload-box {
+            border: 2px dashed #475569;
+            border-radius: 14px;
+            padding: 35px 20px;
+            text-align: center;
+            background: #101a2d;
+        }
+
+        input {
+            display: none;
+        }
+
+        .upload-button {
+            display: inline-block;
+            background: #2563eb;
+            padding: 12px 22px;
+            border-radius: 9px;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+
+        #filename {
+            color: #94a3b8;
+            margin-top: 15px;
+            overflow-wrap: anywhere;
+        }
+
+        button {
+            width: 100%;
+            border: none;
+            border-radius: 9px;
+            padding: 15px;
+            margin-top: 22px;
+            background: #16a34a;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #status {
+            text-align: center;
+            color: #94a3b8;
+            margin-top: 18px;
+        }
+
+        .result {
+            display: none;
+            margin-top: 25px;
+            padding: 22px;
+            border-radius: 12px;
+            background: #101a2d;
+        }
+
+        .prediction {
+            text-align: center;
+            font-size: 25px;
+            font-weight: bold;
+            margin: 15px 0 25px;
+        }
+
+        .metric {
+            margin-top: 18px;
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .bar {
+            height: 10px;
+            background: #334155;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.4s;
+        }
+
+        #realBar {
+            background: #3b82f6;
+        }
+
+        #aiBar {
+            background: #f97316;
+        }
+
+        .note {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 22px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Audio Deepfake Detector</h1>
+
+    <p class="subtitle">
+        Analyze an audio recording using machine learning
+    </p>
+
+    <div class="upload-box">
+
+        <div style="font-size: 42px;">🎧</div>
+
+        <p>Select an audio recording to analyze</p>
+
+        <label for="audioFile" class="upload-button">
+            Choose Audio
+        </label>
+
+        <input
+            type="file"
+            id="audioFile"
+            accept=".wav,.mp3,.flac,.m4a,.ogg,.mp4,audio/*,video/mp4"
+        >
+
+        <div id="filename">No file selected</div>
+
+    </div>
+
+    <button id="detectButton" onclick="detectAudio()" disabled>
+        Detect Audio
+    </button>
+
+    <div id="status"></div>
+
+    <div class="result" id="result">
+
+        <h3 style="text-align:center;">Detection Result</h3>
+
+        <div class="prediction" id="prediction"></div>
+
+        <div class="metric">
+            <div class="metric-header">
+                <span>Real Speech</span>
+                <span id="realValue">0%</span>
+            </div>
+            <div class="bar">
+                <div class="fill" id="realBar"></div>
+            </div>
+        </div>
+
+        <div class="metric">
+            <div class="metric-header">
+                <span>AI Generated</span>
+                <span id="aiValue">0%</span>
+            </div>
+            <div class="bar">
+                <div class="fill" id="aiBar"></div>
+            </div>
+        </div>
+
+        <p class="note">
+            These are model probability estimates, not proof of
+            authenticity. Results depend on the training data and
+            recording conditions.
+        </p>
+
+    </div>
+
+</div>
+
+<script>
+    const audioInput = document.getElementById("audioFile");
+    const detectButton = document.getElementById("detectButton");
+
+    audioInput.addEventListener("change", () => {
+
+        const file = audioInput.files[0];
+
+        document.getElementById("filename").textContent =
+            file ? file.name : "No file selected";
+
+        detectButton.disabled = !file;
+
+        document.getElementById("result").style.display = "none";
+        document.getElementById("status").textContent = "";
+    });
+
+    async function detectAudio() {
+
+        const file = audioInput.files[0];
+
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        detectButton.disabled = true;
+
+        document.getElementById("status").textContent =
+            "Analyzing audio...";
+
+        document.getElementById("result").style.display = "none";
+
+        try {
+
+            const response = await fetch("/predict", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || "Prediction failed");
+            }
+
+            document.getElementById("prediction").textContent =
+                data.prediction;
+
+            document.getElementById("realValue").textContent =
+                data.real_probability + "%";
+
+            document.getElementById("aiValue").textContent =
+                data.ai_probability + "%";
+
+            document.getElementById("realBar").style.width =
+                data.real_probability + "%";
+
+            document.getElementById("aiBar").style.width =
+                data.ai_probability + "%";
+
+            document.getElementById("result").style.display = "block";
+
+            document.getElementById("status").textContent =
+                "Analysis completed.";
+
+        } catch (error) {
+
+            document.getElementById("status").textContent =
+                "Error: " + error.message;
+
+        } finally {
+
+            detectButton.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
